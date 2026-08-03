@@ -17,7 +17,7 @@ from states.options_state import OptionsState
 
 SCREEN_WIDTH = 1500
 SCREEN_HEIGHT = 600
-WINDOW_TITLE = "My Game"
+WINDOW_TITLE = "FREDDY WORLD"
 
 TARGET_FPS = 60
 BACKGROUND_COLOR = (20, 20, 30)

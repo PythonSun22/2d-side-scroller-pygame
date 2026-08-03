@@ -21,6 +21,7 @@ class Level1State(BaseState):
 
         self.player = Player(
             position=(300, 375),
+            screen_width=self.screen.get_width(),
         )
 
         self.debug_font = pygame.font.Font(None, 28)
@@ -50,6 +51,7 @@ class Level1State(BaseState):
     def render(self, screen: pygame.Surface) -> None:
         self.background.render(screen)
         self.player.render(screen)
+        self.player.render_debug_hitbox(screen)
 
         debug_surface = self.debug_font.render(
             "Level 1 foundation — movement comes next",
