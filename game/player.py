@@ -27,6 +27,7 @@ class Player:
         self,
         position: tuple[int, int],
         screen_width: int,
+        ground_y: int,
     ) -> None:
         self.frames = [
             assets.load_image(filename, alpha=True)
@@ -37,10 +38,14 @@ class Player:
         self.image = self.frames[self.current_frame]
 
         self.screen_width = screen_width
+        self.ground_y = ground_y
 
         self.facing_right = True
         self.is_moving = False
         self.animation_elapsed = 0.0
+        self.velocity_y = 0.0
+        self.is_on_ground = True
+        self.jump_requested = False 
 
         # The supplied position is the top-left position of the first frame.
         initial_rect = self.image.get_rect(topleft=position)
@@ -80,10 +85,60 @@ class Player:
         elif direction > 0:
             self.facing_right = True
 
+        self._handle_jump()
         self._move_horizontally(direction, delta_time)
+        self._apply_vertical_physics(delta_time)
         self._update_animation(delta_time)
         self._synchronize_rectangles()
         self._keep_inside_screen()
+
+    def handle_event(self, event: pygame.event.Event) -> None:
+        if event.type != pygame.KEYDOWN:
+            return
+
+        if event.key in (pygame.K_SPACE, pygame.K_UP, pygame.K_w):
+            self.jump_requested = True
+
+    def _handle_jump(self) -> None:
+        if self.jump_requested and self.is_on_ground:
+            self.velocity_y = -PlayerTuning.JUMP_SPEED
+            self.is_on_ground = False
+
+        self.jump_requested = False
+
+    def _apply_vertical_physics(
+        self,
+        delta_time: float,
+    ) -> None:
+        if not self.is_on_ground:
+            self.velocity_y += (
+                PlayerTuning.GRAVITY
+                * delta_time
+            )
+
+            self.velocity_y = min(
+                self.velocity_y,
+                PlayerTuning.MAX_FALL_SPEED,
+            )
+
+            self.feet_y += (
+                self.velocity_y
+                * delta_time
+            )
+
+        hitbox_bottom = (
+            self.feet_y
+            - PlayerTuning.HITBOX_VERTICAL_OFFSET
+        )
+
+        if hitbox_bottom >= self.ground_y:
+            self.feet_y = (
+                self.ground_y
+                + PlayerTuning.HITBOX_VERTICAL_OFFSET
+            )
+
+            self.velocity_y = 0.0
+            self.is_on_ground = True
 
     def _move_horizontally(
         self,

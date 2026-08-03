@@ -22,6 +22,7 @@ class Level1State(BaseState):
         self.player = Player(
             position=(300, 375),
             screen_width=self.screen.get_width(),
+            ground_y=476,
         )
 
         self.debug_font = pygame.font.Font(None, 28)
@@ -36,6 +37,8 @@ class Level1State(BaseState):
         self,
         event: pygame.event.Event,
     ) -> None:
+        self.player.handle_event(event)
+
         if event.type != pygame.KEYDOWN:
             return
 

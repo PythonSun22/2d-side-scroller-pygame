@@ -22,3 +22,8 @@ class PlayerTuning:
 
     # Idle sprite alignment
     IDLE_IMAGE_OFFSET_X = 8
+
+    # Vertical physics
+    GRAVITY = 1800.0
+    JUMP_SPEED = 700.0
+    MAX_FALL_SPEED = 1000.0
