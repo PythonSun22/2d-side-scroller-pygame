@@ -27,7 +27,7 @@ class Player:
     def __init__(
         self,
         position: tuple[int, int],
-        screen_width: int,
+        world_width: int,
         ground_y: int,
     ) -> None:
         self.frames = [
@@ -38,7 +38,7 @@ class Player:
         self.current_frame = 0
         self.image = self.frames[self.current_frame]
 
-        self.screen_width = screen_width
+        self.world_width = world_width
         self.ground_y = ground_y
 
         self.facing_right = True
@@ -91,7 +91,7 @@ class Player:
         self._apply_vertical_physics(delta_time, platforms)
         self._update_animation(delta_time)
         self._synchronize_rectangles()
-        self._keep_inside_screen()
+        self._keep_inside_world()
 
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type != pygame.KEYDOWN:
@@ -248,40 +248,51 @@ class Player:
             self.feet_y - PlayerTuning.HITBOX_VERTICAL_OFFSET,
         )
 
-    def _keep_inside_screen(self) -> None:
+    def _keep_inside_world(self) -> None:
         """
-        Keep the facing-dependent hitbox inside the screen.
-
-        Adjusting feet_x keeps the image and hitbox synchronized.
+        Keep Freddy's collision box inside the playable world.
         """
         correction = 0
 
         if self.collision_rect.left < 0:
             correction = -self.collision_rect.left
 
-        elif self.collision_rect.right > self.screen_width:
+        elif self.collision_rect.right > self.world_width:
             correction = (
-                self.screen_width
+                self.world_width
                 - self.collision_rect.right
             )
 
         if correction != 0:
             self.feet_x += correction
             self._synchronize_rectangles()
-
-    def render(self, screen: pygame.Surface) -> None:
+        
+    def render(
+        self,
+        screen: pygame.Surface,
+        camera_x: float,
+    ) -> None:
         screen.blit(
             self.image,
-            self.image_rect,
+            (
+                self.image_rect.x - round(camera_x),
+                self.image_rect.y,
+            ),
         )
 
     def render_debug_hitbox(
         self,
         screen: pygame.Surface,
+        camera_x: float,
     ) -> None:
+        debug_rect = self.collision_rect.move(
+            -round(camera_x),
+            0,
+        )
+
         pygame.draw.rect(
             screen,
             (0, 255, 0),
-            self.collision_rect,
+            debug_rect,
             width=2,
         )

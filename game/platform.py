@@ -19,17 +19,35 @@ class Platform:
         self.rect = rect
         self.color = color
 
-    def render(self, screen: pygame.Surface) -> None:
+    def render(
+        self,
+        screen: pygame.Surface,
+        camera_x: float,
+    ) -> None:
+        screen_rect = self.rect.move(
+            -round(camera_x),
+            0,
+        )
+
         pygame.draw.rect(
             screen,
             self.color,
-            self.rect,
+            screen_rect,
         )
 
-    def render_debug(self, screen: pygame.Surface) -> None:
+    def render_debug(
+        self,
+        screen: pygame.Surface,
+        camera_x: float,
+    ) -> None:
+        screen_rect = self.rect.move(
+            -round(camera_x),
+            0,
+        )
+
         pygame.draw.rect(
             screen,
             (255, 220, 0),
-            self.rect,
+            screen_rect,
             width=2,
         )

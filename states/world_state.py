@@ -6,6 +6,7 @@ from game.world_background import WorldBackground
 from game.player import Player
 from states.base_state import BaseState
 from game.platform import Platform
+from game.camera import Camera
 
 
 class WorldState(BaseState):
@@ -20,9 +21,16 @@ class WorldState(BaseState):
             self.screen.get_size()
         )
 
+        self.world_width = self.background.world_width
+
+        self.camera = Camera(
+            screen_width=self.screen.get_width(),
+            world_width=self.world_width,
+        )
+
         self.player = Player(
             position=(300, 375),
-            screen_width=self.screen.get_width(),
+            world_width=self.world_width,
             ground_y=476,
         )
 
@@ -35,6 +43,17 @@ class WorldState(BaseState):
             ),
             Platform(
                 pygame.Rect(1120, 225, 180, 24)
+            ),
+
+            # Additional platforms farther into the world for camera testing.
+            Platform(
+                pygame.Rect(1600, 355, 200, 24)
+            ),
+            Platform(
+                pygame.Rect(2000, 285, 180, 24)
+            ),
+            Platform(
+                pygame.Rect(2400, 335, 220, 24)
             ),
         ]
 
@@ -62,20 +81,47 @@ class WorldState(BaseState):
             self.state_manager.change_state("options")
 
     def update(self, delta_time: float) -> None:
-        self.player.update(delta_time, self.platforms)
+        self.player.update(
+            delta_time,
+            self.platforms,
+        )
+
+        self.camera.update(
+            self.player.collision_rect
+        )
 
     def render(self, screen: pygame.Surface) -> None:
-        self.background.render(screen)
+        self.background.render(
+            screen,
+            self.camera.x,
+        )
 
         for platform in self.platforms:
-            platform.render(screen)
-            platform.render_debug(screen)
+            platform.render(
+                screen,
+                self.camera.x,
+            )
 
-        self.player.render(screen)
-        self.player.render_debug_hitbox(screen)
+            platform.render_debug(
+                screen,
+                self.camera.x,
+            )
+
+        self.player.render(
+            screen,
+            self.camera.x,
+        )
+
+        self.player.render_debug_hitbox(
+            screen,
+            self.camera.x,
+        )
 
         debug_surface = self.debug_font.render(
-            "World foundation — camera architecture milestone",
+            (
+                f"World X: {round(self.player.feet_x)}  "
+                f"Camera X: {round(self.camera.x)}"
+            ),
             True,
             (255, 255, 255),
         )
