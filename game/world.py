@@ -6,6 +6,7 @@ from game.camera import Camera
 from game.platform import Platform
 from game.player import Player
 from game.world_background import WorldBackground
+from game.mob import Mob
 
 
 class World:
@@ -40,10 +41,21 @@ class World:
             ground_y=self.GROUND_COLLISION_Y,
         )
 
+        self.mobs = self._create_mobs()
+
         self.platforms = self._create_platforms()
 
         self.debug_font = pygame.font.Font(None, 28)
         self.show_debug = True
+
+    def _create_mobs(self) -> list[Mob]:
+        return [
+            Mob(
+                position=(1350, self.GROUND_COLLISION_Y),
+                patrol_left=1250,
+                patrol_right=1550,
+            ),
+        ]
 
     def _create_platforms(self) -> list[Platform]:
         """
@@ -87,17 +99,19 @@ class World:
                 self.show_debug = not self.show_debug
 
     def update(self, delta_time: float) -> None:
-        """
-        Update gameplay objects, then update the camera using the player's
-        resulting world position.
-        """
         self.player.begin_physics_step()
         self.camera.begin_physics_step()
+
+        for mob in self.mobs:
+            mob.begin_physics_step()
 
         self.player.update(
             delta_time,
             self.platforms,
         )
+
+        for mob in self.mobs:
+            mob.update(delta_time)
 
         self.camera.update(
             self.player.collision_rect
@@ -121,6 +135,13 @@ class World:
                 camera_x,
             )
 
+        for mob in self.mobs:
+            mob.render(
+                screen,
+                camera_x,
+                alpha,
+            )
+
         self.player.render(
             screen,
             camera_x,
@@ -141,6 +162,13 @@ class World:
             platform.render_debug(
                 screen,
                 camera_x,
+            )
+
+        for mob in self.mobs:
+            mob.render_debug_hitbox(
+                screen,
+                camera_x,
+                alpha,
             )
 
         self.player.render_debug_hitbox(
