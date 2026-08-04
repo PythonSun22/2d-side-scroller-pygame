@@ -1,0 +1,158 @@
+from __future__ import annotations
+
+import pygame
+
+from game.camera import Camera
+from game.platform import Platform
+from game.player import Player
+from game.world_background import WorldBackground
+
+
+class World:
+    """
+    Owns and coordinates everything inside Freddy's playable world.
+
+    World contains gameplay objects and systems. It does not know about the
+    application state manager, menus, options screens, or state transitions.
+    """
+
+    PLAYER_START_POSITION = (300, 375)
+    GROUND_COLLISION_Y = 476
+
+    def __init__(
+        self,
+        screen_size: tuple[int, int],
+    ) -> None:
+        self.screen_width, self.screen_height = screen_size
+
+        self.background = WorldBackground(screen_size)
+
+        self.world_width = self.background.world_width
+
+        self.camera = Camera(
+            screen_width=self.screen_width,
+            world_width=self.world_width,
+        )
+
+        self.player = Player(
+            position=self.PLAYER_START_POSITION,
+            world_width=self.world_width,
+            ground_y=self.GROUND_COLLISION_Y,
+        )
+
+        self.platforms = self._create_platforms()
+
+        self.debug_font = pygame.font.Font(None, 28)
+        self.show_debug = True
+
+    def _create_platforms(self) -> list[Platform]:
+        """
+        Build the world's current platform layout.
+
+        These temporary rectangles can later receive visual platform assets
+        without changing their collision geometry.
+        """
+        return [
+            Platform(
+                pygame.Rect(520, 365, 180, 24)
+            ),
+            Platform(
+                pygame.Rect(820, 295, 180, 24)
+            ),
+            Platform(
+                pygame.Rect(1120, 225, 180, 24)
+            ),
+            Platform(
+                pygame.Rect(1600, 355, 200, 24)
+            ),
+            Platform(
+                pygame.Rect(2000, 285, 180, 24)
+            ),
+            Platform(
+                pygame.Rect(2400, 335, 220, 24)
+            ),
+        ]
+
+    def handle_event(
+        self,
+        event: pygame.event.Event,
+    ) -> None:
+        """
+        Forward gameplay-specific events to world objects.
+        """
+        self.player.handle_event(event)
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_F1:
+                self.show_debug = not self.show_debug
+
+    def update(self, delta_time: float) -> None:
+        """
+        Update gameplay objects, then update the camera using the player's
+        resulting world position.
+        """
+        self.player.update(
+            delta_time,
+            self.platforms,
+        )
+
+        self.camera.update(
+            self.player.collision_rect
+        )
+
+    def render(self, screen: pygame.Surface) -> None:
+        """
+        Render the playable world using camera-relative coordinates.
+        """
+        camera_x = self.camera.x
+
+        self.background.render(
+            screen,
+            camera_x,
+        )
+
+        for platform in self.platforms:
+            platform.render(
+                screen,
+                camera_x,
+            )
+
+        self.player.render(
+            screen,
+            camera_x,
+        )
+
+        if self.show_debug:
+            self._render_debug(screen)
+
+    def _render_debug(
+        self,
+        screen: pygame.Surface,
+    ) -> None:
+        camera_x = self.camera.x
+
+        for platform in self.platforms:
+            platform.render_debug(
+                screen,
+                camera_x,
+            )
+
+        self.player.render_debug_hitbox(
+            screen,
+            camera_x,
+        )
+
+        debug_surface = self.debug_font.render(
+            (
+                f"World X: {round(self.player.feet_x)}  "
+                f"Camera X: {round(camera_x)}  "
+                "F1: Toggle Debug"
+            ),
+            True,
+            (255, 255, 255),
+        )
+
+        screen.blit(
+            debug_surface,
+            (20, 20),
+        )
