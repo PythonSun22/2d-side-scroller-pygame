@@ -5,22 +5,22 @@ import pygame
 from game.assets import assets
 
 
-class LevelBackground:
+class WorldBackground:
     """
-    Renders the layered Level 1 background and ground.
+    Renders the layered World background and ground.
 
     Scrolling is intentionally disabled for this milestone.
     """
 
     BACKGROUND_FILES = (
-        "level1/backgrounds/plx-1.png",
-        "level1/backgrounds/plx-2.png",
-        "level1/backgrounds/plx-3.png",
-        "level1/backgrounds/plx-4.png",
-        "level1/backgrounds/plx-5.png",
+        "world/backgrounds/plx-1.png",
+        "world/backgrounds/plx-2.png",
+        "world/backgrounds/plx-3.png",
+        "world/backgrounds/plx-4.png",
+        "world/backgrounds/plx-5.png",
     )
 
-    GROUND_FILE = "level1/backgrounds/ground.png"
+    GROUND_FILE = "world/backgrounds/ground.png"
 
     def __init__(self, screen_size: tuple[int, int]) -> None:
         self.screen_width, self.screen_height = screen_size

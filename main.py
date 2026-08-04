@@ -6,7 +6,7 @@ import sys
 import pygame
 
 from state_manager import StateManager
-from states.level1_state import Level1State
+from states.world_state import WorldState
 from states.menu_state import MenuState
 from states.options_state import OptionsState
 
@@ -83,7 +83,7 @@ class Game:
             state_manager=self.state_manager,
         )
 
-        level1_state = Level1State(
+        world_state = WorldState(
             screen=self.screen,
             state_manager=self.state_manager,
         )
@@ -94,7 +94,7 @@ class Game:
         )
 
         self.state_manager.register_state("menu", menu_state)
-        self.state_manager.register_state("level1", level1_state)
+        self.state_manager.register_state("world", world_state)
         self.state_manager.register_state("options", options_state)
 
         self.state_manager.change_state("menu")

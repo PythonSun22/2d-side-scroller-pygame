@@ -4,6 +4,7 @@ import pygame
 
 from game.assets import assets
 from game.player_tuning import PlayerTuning
+from game.platform import Platform
 
 class Player:
     """
@@ -67,7 +68,7 @@ class Player:
 
         self._synchronize_rectangles()
 
-    def update(self, delta_time: float) -> None:
+    def update(self, delta_time: float, platforms: list) -> None:
         keys = pygame.key.get_pressed()
 
         direction = 0
@@ -87,7 +88,7 @@ class Player:
 
         self._handle_jump()
         self._move_horizontally(direction, delta_time)
-        self._apply_vertical_physics(delta_time)
+        self._apply_vertical_physics(delta_time, platforms)
         self._update_animation(delta_time)
         self._synchronize_rectangles()
         self._keep_inside_screen()
@@ -109,29 +110,59 @@ class Player:
     def _apply_vertical_physics(
         self,
         delta_time: float,
+        platforms: list,
     ) -> None:
-        if not self.is_on_ground:
-            self.velocity_y += (
-                PlayerTuning.GRAVITY
-                * delta_time
-            )
+        previous_hitbox_bottom = self.collision_rect.bottom
 
-            self.velocity_y = min(
-                self.velocity_y,
-                PlayerTuning.MAX_FALL_SPEED,
-            )
-
-            self.feet_y += (
-                self.velocity_y
-                * delta_time
-            )
-
-        hitbox_bottom = (
-            self.feet_y
-            - PlayerTuning.HITBOX_VERTICAL_OFFSET
+        self.velocity_y += (
+            PlayerTuning.GRAVITY
+            * delta_time
         )
 
-        if hitbox_bottom >= self.ground_y:
+        self.velocity_y = min(
+            self.velocity_y,
+            PlayerTuning.MAX_FALL_SPEED,
+        )
+
+        self.feet_y += (
+            self.velocity_y
+            * delta_time
+        )
+
+        self._synchronize_rectangles()
+
+        self.is_on_ground = False
+
+        # Only land while falling.
+        if self.velocity_y >= 0:
+            for platform in platforms:
+                crossed_platform_top = (
+                    previous_hitbox_bottom <= platform.rect.top
+                    and self.collision_rect.bottom >= platform.rect.top
+                )
+
+                overlaps_horizontally = (
+                    self.collision_rect.right > platform.rect.left
+                    and self.collision_rect.left < platform.rect.right
+                )
+
+                if crossed_platform_top and overlaps_horizontally:
+                    self.feet_y = (
+                        platform.rect.top
+                        + PlayerTuning.HITBOX_VERTICAL_OFFSET
+                    )
+
+                    self.velocity_y = 0.0
+                    self.is_on_ground = True
+
+                    self._synchronize_rectangles()
+                    break
+
+        # Ground remains the final fallback.
+        if (
+            not self.is_on_ground
+            and self.collision_rect.bottom >= self.ground_y
+        ):
             self.feet_y = (
                 self.ground_y
                 + PlayerTuning.HITBOX_VERTICAL_OFFSET
@@ -139,6 +170,8 @@ class Player:
 
             self.velocity_y = 0.0
             self.is_on_ground = True
+
+            self._synchronize_rectangles()
 
     def _move_horizontally(
         self,
@@ -152,7 +185,7 @@ class Player:
         )
 
     def _update_animation(self, delta_time: float) -> None:
-        if not self.is_moving:
+        if not self.is_moving or not self.is_on_ground:
             self.current_frame = 0
             self.animation_elapsed = 0.0
             self._refresh_image()

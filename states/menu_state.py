@@ -230,7 +230,7 @@ class MenuState(BaseState):
         mouse_position: tuple[int, int],
     ) -> None:
         if self.play_button.contains(mouse_position):
-            self.state_manager.change_state("level1")
+            self.state_manager.change_state("world")
 
         elif self.options_button.contains(mouse_position):
             self.state_manager.change_state("options")
@@ -271,7 +271,7 @@ class MenuState(BaseState):
         selected_button = self.buttons[self.selected_index]
 
         if selected_button is self.play_button:
-            self.state_manager.change_state("level1")
+            self.state_manager.change_state("world")
 
         elif selected_button is self.options_button:
             self.state_manager.change_state("options")
