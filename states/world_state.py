@@ -51,5 +51,5 @@ class WorldState(BaseState):
     def update(self, delta_time: float) -> None:
         self.world.update(delta_time)
 
-    def render(self, screen: pygame.Surface) -> None:
-        self.world.render(screen)
+    def render(self, screen: pygame.Surface, alpha: float) -> None:
+        self.world.render(screen, alpha)

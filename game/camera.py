@@ -20,6 +20,7 @@ class Camera:
         self.world_width = max(world_width, screen_width)
 
         self.x = 0.0
+        self.previous_x = self.x
 
         # Freddy may move freely within this region before the camera follows.
         self.left_dead_zone = int(screen_width * 0.35)
@@ -31,6 +32,25 @@ class Camera:
             max(0, self.world_width - self.screen_width)
         )
 
+    def begin_physics_step(self) -> None:
+        """
+        Preserve the camera position before the next fixed update.
+        """
+        self.previous_x = self.x
+
+    def get_interpolated_x(
+        self,
+        alpha: float,
+    ) -> float:
+        """
+        Return a visual camera position between the previous and current
+        physics states.
+        """
+        return (
+            self.previous_x
+            + (self.x - self.previous_x) * alpha
+        )
+        
     def update(self, target_rect: pygame.Rect) -> None:
         """
         Follow the target only when it leaves the horizontal dead zone.

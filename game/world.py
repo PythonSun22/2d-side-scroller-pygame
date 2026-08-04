@@ -91,6 +91,9 @@ class World:
         Update gameplay objects, then update the camera using the player's
         resulting world position.
         """
+        self.player.begin_physics_step()
+        self.camera.begin_physics_step()
+
         self.player.update(
             delta_time,
             self.platforms,
@@ -100,11 +103,12 @@ class World:
             self.player.collision_rect
         )
 
-    def render(self, screen: pygame.Surface) -> None:
-        """
-        Render the playable world using camera-relative coordinates.
-        """
-        camera_x = self.camera.x
+    def render(
+        self,
+        screen: pygame.Surface,
+        alpha: float,
+    ) -> None:
+        camera_x = self.camera.get_interpolated_x(alpha)
 
         self.background.render(
             screen,
@@ -120,16 +124,18 @@ class World:
         self.player.render(
             screen,
             camera_x,
+            alpha,
         )
 
         if self.show_debug:
-            self._render_debug(screen)
+            self._render_debug(screen, camera_x, alpha)
 
     def _render_debug(
         self,
         screen: pygame.Surface,
+        camera_x: float,
+        alpha: float,
     ) -> None:
-        camera_x = self.camera.x
 
         for platform in self.platforms:
             platform.render_debug(
@@ -140,6 +146,7 @@ class World:
         self.player.render_debug_hitbox(
             screen,
             camera_x,
+            alpha,
         )
 
         debug_surface = self.debug_font.render(

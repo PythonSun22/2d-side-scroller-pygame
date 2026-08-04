@@ -162,7 +162,7 @@ class MenuState(BaseState):
         if any(button.contains(mouse_position) for button in self.buttons):
             self._update_mouse_hover(mouse_position)
 
-    def render(self, screen: pygame.Surface) -> None:
+    def render(self, screen: pygame.Surface, alpha: float) -> None:
         screen.blit(self.background, (0, 0))
 
         self._render_title(screen)

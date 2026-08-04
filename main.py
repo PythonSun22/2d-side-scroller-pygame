@@ -20,6 +20,11 @@ SCREEN_HEIGHT = 600
 WINDOW_TITLE = "FREDDY WORLD"
 
 TARGET_FPS = 60
+
+FIXED_TIME_STEP = 1.0/60.0
+MAX_FRAME_TIME = 0.1
+MAX_PHYSICS_STEPS = 6
+
 BACKGROUND_COLOR = (20, 20, 30)
 
 
@@ -43,11 +48,12 @@ class Game:
 
     def __init__(self) -> None:
         self.running = True
+        self.physics_accumulator = 0.0
 
         self.screen: pygame.Surface
         self.clock: pygame.time.Clock
         self.state_manager: StateManager
-
+    
         self._initialize_pygame()
         self._create_state_manager()
 
@@ -115,14 +121,14 @@ class Game:
         if current_state is not None:
             current_state.update(delta_time)
 
-    def render(self) -> None:
+    def render(self, alpha: float) -> None:
         """Render the currently active state."""
         self.screen.fill(BACKGROUND_COLOR)
 
         current_state = self.state_manager.current_state
 
         if current_state is not None:
-            current_state.render(self.screen)
+            current_state.render(self.screen, alpha)
 
         pygame.display.flip()
 
@@ -134,7 +140,11 @@ class Game:
         through Pygbag. It is harmless during normal desktop execution.
         """
         while self.running:
-            delta_time = self.clock.tick(TARGET_FPS) / 1000.0
+            frame_time = self.clock.tick(TARGET_FPS) / 1000.0
+
+            # Prevent tab switches, debugging pauses, or browser stalls from
+            # producing an enormous physics catch-up.
+            frame_time = min(frame_time, MAX_FRAME_TIME)
 
             for event in pygame.event.get():
                 self.handle_global_event(event)
@@ -144,8 +154,28 @@ class Game:
                 if current_state is not None:
                     current_state.handle_event(event)
 
-            self.update(delta_time)
-            self.render()
+            self.physics_accumulator += frame_time
+
+            physics_steps = 0
+
+            while (
+                self.physics_accumulator >= FIXED_TIME_STEP
+                and physics_steps < MAX_PHYSICS_STEPS
+            ):
+                self.update(FIXED_TIME_STEP)
+
+                self.physics_accumulator -= FIXED_TIME_STEP
+                physics_steps += 1
+
+            # If the simulation cannot catch up within the allowed number of
+            # steps, discard the excess instead of allowing a growing backlog.
+            if physics_steps == MAX_PHYSICS_STEPS:
+                self.physics_accumulator = min(
+                    self.physics_accumulator,
+                    FIXED_TIME_STEP,
+                )
+            alpha = self.physics_accumulator / FIXED_TIME_STEP
+            self.render(alpha)
 
             await asyncio.sleep(0)
 

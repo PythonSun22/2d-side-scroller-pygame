@@ -40,5 +40,5 @@ class BaseState(ABC):
         """Update state-specific behavior."""
 
     @abstractmethod
-    def render(self, screen: pygame.Surface) -> None:
+    def render(self, screen: pygame.Surface, alpha: float) -> None:
         """Draw the state onto the shared display surface."""

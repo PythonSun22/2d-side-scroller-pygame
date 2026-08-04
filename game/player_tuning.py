@@ -27,3 +27,6 @@ class PlayerTuning:
     GRAVITY = 1800.0
     JUMP_SPEED = 700.0
     MAX_FALL_SPEED = 1000.0
+
+    # Jump forgiveness
+    COYOTE_TIME = 0.08

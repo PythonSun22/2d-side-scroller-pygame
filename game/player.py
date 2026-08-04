@@ -47,13 +47,17 @@ class Player:
         self.velocity_y = 0.0
         self.is_on_ground = True
         self.jump_requested = False 
+        self.coyote_timer = PlayerTuning.COYOTE_TIME
 
         # The supplied position is the top-left position of the first frame.
         initial_rect = self.image.get_rect(topleft=position)
 
         # This point becomes the stable anchor for every animation frame.
         self.feet_x = float(initial_rect.centerx)
-        self.feet_y = initial_rect.bottom
+        self.feet_y = float(initial_rect.bottom)
+
+        self.previous_feet_x = self.feet_x
+        self.previous_feet_y = self.feet_y
 
         self.image_rect = self.image.get_rect(
             midbottom=(round(self.feet_x), self.feet_y)
@@ -67,6 +71,36 @@ class Player:
         )
 
         self._synchronize_rectangles()
+
+    def begin_physics_step(self) -> None:
+        """
+        Preserve the current physics position before the next fixed update.
+
+        Rendering will later interpolate between the previous and current
+        positions.
+        """
+        self.previous_feet_x = self.feet_x
+        self.previous_feet_y = self.feet_y
+
+    def get_interpolated_feet_position(
+        self,
+        alpha: float,
+    ) -> tuple[float, float]:
+        """
+        Return Freddy's visual feet position between the previous and current
+        fixed physics states.
+        """
+        render_x = (
+            self.previous_feet_x
+            + (self.feet_x - self.previous_feet_x) * alpha
+        )
+
+        render_y = (
+            self.previous_feet_y
+            + (self.feet_y - self.previous_feet_y) * alpha
+        )
+
+        return render_x, render_y
 
     def update(self, delta_time: float, platforms: list) -> None:
         keys = pygame.key.get_pressed()
@@ -86,6 +120,7 @@ class Player:
         elif direction > 0:
             self.facing_right = True
 
+        self._update_coyote_timer(delta_time)
         self._handle_jump()
         self._move_horizontally(direction, delta_time)
         self._apply_vertical_physics(delta_time, platforms)
@@ -100,10 +135,28 @@ class Player:
         if event.key in (pygame.K_SPACE, pygame.K_UP, pygame.K_w):
             self.jump_requested = True
 
+    def _update_coyote_timer(self, delta_time: float) -> None:
+        if self.is_on_ground:
+            self.coyote_timer = PlayerTuning.COYOTE_TIME
+        else:
+            self.coyote_timer = max(
+                0.0,
+                self.coyote_timer - delta_time,
+            )
+
     def _handle_jump(self) -> None:
-        if self.jump_requested and self.is_on_ground:
+        can_jump = (
+            self.is_on_ground
+            or self.coyote_timer > 0.0
+        )
+
+        if self.jump_requested and can_jump:
             self.velocity_y = -PlayerTuning.JUMP_SPEED
             self.is_on_ground = False
+
+            # Consume the grace period so one ledge departure cannot grant
+            # more than one jump.
+            self.coyote_timer = 0.0
 
         self.jump_requested = False
 
@@ -271,23 +324,70 @@ class Player:
         self,
         screen: pygame.Surface,
         camera_x: float,
+        alpha: float,
     ) -> None:
+        render_feet_x, render_feet_y = (
+            self.get_interpolated_feet_position(alpha)
+        )
+
+        image_offset_x = 0
+
+        if self.current_frame == 0:
+            image_offset_x = (
+                PlayerTuning.IDLE_IMAGE_OFFSET_X
+                if self.facing_right
+                else -PlayerTuning.IDLE_IMAGE_OFFSET_X
+            )
+
+        render_rect = self.image.get_rect(
+            midbottom=(
+                round(
+                    render_feet_x
+                    + image_offset_x
+                    - camera_x
+                ),
+                round(render_feet_y),
+            )
+        )
+
         screen.blit(
             self.image,
-            (
-                self.image_rect.x - round(camera_x),
-                self.image_rect.y,
-            ),
+            render_rect,
         )
 
     def render_debug_hitbox(
         self,
         screen: pygame.Surface,
         camera_x: float,
+        alpha: float,
     ) -> None:
-        debug_rect = self.collision_rect.move(
-            -round(camera_x),
+        render_feet_x, render_feet_y = (
+            self.get_interpolated_feet_position(alpha)
+        )
+
+        facing_offset = (
+            PlayerTuning.HITBOX_FACING_OFFSET
+            if self.facing_right
+            else -PlayerTuning.HITBOX_FACING_OFFSET
+        )
+
+        debug_rect = pygame.Rect(
             0,
+            0,
+            PlayerTuning.HITBOX_WIDTH,
+            PlayerTuning.HITBOX_HEIGHT,
+        )
+
+        debug_rect.midbottom = (
+            round(
+                render_feet_x
+                + facing_offset
+                - camera_x
+            ),
+            round(
+                render_feet_y
+                - PlayerTuning.HITBOX_VERTICAL_OFFSET
+            ),
         )
 
         pygame.draw.rect(

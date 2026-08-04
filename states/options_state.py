@@ -32,7 +32,7 @@ class OptionsState(BaseState):
     def update(self, delta_time: float) -> None:
         pass
 
-    def render(self, screen: pygame.Surface) -> None:
+    def render(self, screen: pygame.Surface, alpha: float) -> None:
         screen.fill(self.background_color)
 
         title_surface = self.font.render(
