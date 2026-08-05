@@ -7,6 +7,7 @@ from game.platform import Platform
 from game.player import Player
 from game.world_background import WorldBackground
 from game.mob import Mob
+from game.player_tuning import PlayerTuning
 
 
 class World:
@@ -111,7 +112,9 @@ class World:
         )
 
         for mob in self.mobs:
-            mob.update(delta_time)
+            mob.update(delta_time, self.player)
+
+        self._handle_mob_contact()
 
         self.camera.update(
             self.player.collision_rect
@@ -147,6 +150,8 @@ class World:
             camera_x,
             alpha,
         )
+
+        self._render_hud(screen)
 
         if self.show_debug:
             self._render_debug(screen, camera_x, alpha)
@@ -190,4 +195,32 @@ class World:
         screen.blit(
             debug_surface,
             (20, 20),
+        )
+
+    def _handle_mob_contact(self) -> None:
+        for mob in self.mobs:
+            if self.player.collision_rect.colliderect(
+                mob.collision_rect
+            ):
+                self.player.take_damage(
+                    amount=PlayerTuning.CONTACT_DAMAGE,
+                    source_x=mob.feet_x,
+                )
+
+    def _render_hud(
+        self,
+        screen: pygame.Surface,
+    ) -> None:
+        health_surface = self.debug_font.render(
+            (
+                f"Health: {self.player.health}"
+                f"/{PlayerTuning.MAX_HEALTH}"
+            ),
+            True,
+            (255, 255, 255),
+        )
+
+        screen.blit(
+            health_surface,
+            (20, 55),
         )

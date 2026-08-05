@@ -4,7 +4,8 @@ import pygame
 
 from game.assets import assets
 from game.mob_tuning import MobTuning
-
+from game.ai.mob_state import MobState
+from game.ai.patrol_state import PatrolState
 
 class Mob:
     """
@@ -48,6 +49,8 @@ class Mob:
         self.feet_x = float(position[0])
         self.feet_y = float(position[1])
 
+        self.home_x = self.feet_x
+
         self.previous_feet_x = self.feet_x
         self.previous_feet_y = self.feet_y
 
@@ -56,6 +59,10 @@ class Mob:
 
         self.direction = 1
         self.facing_right = True
+        self.is_moving = True
+
+        self._state: MobState | None = None
+        self.change_state(PatrolState(self))
 
         self.animation_elapsed = 0.0
 
@@ -72,29 +79,33 @@ class Mob:
         self.previous_feet_x = self.feet_x
         self.previous_feet_y = self.feet_y
 
-    def update(self, delta_time: float) -> None:
-        self._update_patrol(delta_time)
+    def update(
+        self,
+        delta_time: float,
+        player,
+    ) -> None:
+        self.state.update(delta_time, player)
         self._update_animation(delta_time)
         self._synchronize_collision_rect()
 
-    def _update_patrol(self, delta_time: float) -> None:
-        self.feet_x += (
-            self.direction
-            * MobTuning.PATROL_SPEED
-            * delta_time
-        )
-
-        if self.feet_x >= self.patrol_right:
-            self.feet_x = self.patrol_right
-            self.direction = -1
-            self.facing_right = False
-
-        elif self.feet_x <= self.patrol_left:
-            self.feet_x = self.patrol_left
-            self.direction = 1
-            self.facing_right = True
-
     def _update_animation(self, delta_time: float) -> None:
+        if not self.is_moving:
+            self.current_frame = 0
+            self.animation_elapsed = 0.0
+
+            frame = self.walk_frames[self.current_frame]
+
+            if self.facing_right:
+                self.image = pygame.transform.flip(
+                    frame,
+                    True,
+                    False,
+                )
+            else:
+                self.image = frame
+
+            return
+
         self.animation_elapsed += delta_time
 
         while (
@@ -201,3 +212,40 @@ class Mob:
             debug_rect,
             width=2,
         )
+
+    @property
+    def state(self) -> MobState:
+        if self._state is None:
+            raise RuntimeError("Mob has no active AI state.")
+
+        return self._state
+
+
+    @property
+    def state_name(self) -> str:
+        return type(self.state).__name__
+
+
+    def change_state(self, new_state: MobState) -> None:
+        """
+        Replace the active AI state and run its lifecycle hooks.
+        """
+        if self._state is not None:
+            self._state.exit()
+
+        self._state = new_state
+        self._state.enter()
+
+    def set_direction(self, direction: int) -> None:
+        if direction == 0:
+            return
+
+        self.direction = 1 if direction > 0 else -1
+        self.facing_right = self.direction > 0
+
+
+    def face_world_x(self, target_x: float) -> None:
+        if target_x > self.feet_x:
+            self.set_direction(1)
+        elif target_x < self.feet_x:
+            self.set_direction(-1)

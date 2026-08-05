@@ -30,3 +30,13 @@ class PlayerTuning:
 
     # Jump forgiveness
     COYOTE_TIME = 0.08
+
+    # Health and damage
+    MAX_HEALTH = 3
+    CONTACT_DAMAGE = 1
+
+    INVULNERABILITY_DURATION = 1.0
+
+    KNOCKBACK_HORIZONTAL_SPEED = 420.0
+    KNOCKBACK_VERTICAL_SPEED = 420.0
+    KNOCKBACK_DECELERATION = 1600.0

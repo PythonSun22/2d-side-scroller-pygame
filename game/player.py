@@ -70,6 +70,11 @@ class Player:
             PlayerTuning.HITBOX_HEIGHT,
         )
 
+        self.health = PlayerTuning.MAX_HEALTH
+
+        self.invulnerability_timer = 0.0
+        self.knockback_velocity_x = 0.0
+
         self._synchronize_rectangles()
 
     def begin_physics_step(self) -> None:
@@ -103,6 +108,8 @@ class Player:
         return render_x, render_y
 
     def update(self, delta_time: float, platforms: list) -> None:
+        self._update_damage_state(delta_time)
+
         keys = pygame.key.get_pressed()
 
         direction = 0
@@ -122,8 +129,13 @@ class Player:
 
         self._update_coyote_timer(delta_time)
         self._handle_jump()
+
         self._move_horizontally(direction, delta_time)
+
+        self._apply_horizontal_knockback(delta_time)
+
         self._apply_vertical_physics(delta_time, platforms)
+        
         self._update_animation(delta_time)
         self._synchronize_rectangles()
         self._keep_inside_world()
@@ -330,8 +342,16 @@ class Player:
             self.get_interpolated_feet_position(alpha)
         )
 
-        image_offset_x = 0
+        if self.is_invulnerable:
+            flash_phase = int(
+                self.invulnerability_timer * 12
+            )
 
+            if flash_phase % 2 == 0:
+                return
+
+        image_offset_x = 0
+        
         if self.current_frame == 0:
             image_offset_x = (
                 PlayerTuning.IDLE_IMAGE_OFFSET_X
@@ -396,3 +416,92 @@ class Player:
             debug_rect,
             width=2,
         )
+
+    @property
+    def is_invulnerable(self) -> bool:
+        return self.invulnerability_timer > 0.0
+
+
+    @property
+    def is_defeated(self) -> bool:
+        return self.health <= 0
+
+    def take_damage(
+        self,
+        amount: int,
+        source_x: float,
+    ) -> bool:
+        """
+        Damage Freddy and launch him away from the source.
+
+        Returns True if damage was accepted, or False if Freddy was
+        invulnerable or already defeated.
+        """
+        if amount <= 0:
+            return False
+
+        if self.is_invulnerable or self.is_defeated:
+            return False
+
+        self.health = max(
+            0,
+            self.health - amount,
+        )
+
+        self.invulnerability_timer = (
+            PlayerTuning.INVULNERABILITY_DURATION
+        )
+
+        if self.feet_x < source_x:
+            knockback_direction = -1
+        else:
+            knockback_direction = 1
+
+        self.knockback_velocity_x = (
+            knockback_direction
+            * PlayerTuning.KNOCKBACK_HORIZONTAL_SPEED
+        )
+
+        self.velocity_y = -PlayerTuning.KNOCKBACK_VERTICAL_SPEED
+        self.is_on_ground = False
+        self.coyote_timer = 0.0
+
+        return True
+
+    def _update_damage_state(
+        self,
+        delta_time: float,
+    ) -> None:
+        self.invulnerability_timer = max(
+            0.0,
+            self.invulnerability_timer - delta_time,
+        )
+
+    def _apply_horizontal_knockback(
+        self,
+        delta_time: float,
+    ) -> None:
+        if self.knockback_velocity_x == 0.0:
+            return
+
+        self.feet_x += (
+            self.knockback_velocity_x
+            * delta_time
+        )
+
+        deceleration = (
+            PlayerTuning.KNOCKBACK_DECELERATION
+            * delta_time
+        )
+
+        if self.knockback_velocity_x > 0.0:
+            self.knockback_velocity_x = max(
+                0.0,
+                self.knockback_velocity_x - deceleration,
+            )
+        else:
+            self.knockback_velocity_x = min(
+                0.0,
+                self.knockback_velocity_x + deceleration,
+            )
+
