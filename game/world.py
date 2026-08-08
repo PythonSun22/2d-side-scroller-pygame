@@ -8,6 +8,7 @@ from game.player import Player
 from game.world_background import WorldBackground
 from game.mob import Mob
 from game.player_tuning import PlayerTuning
+from game.weapons.sword import Sword
 
 
 class World:
@@ -41,6 +42,7 @@ class World:
             world_width=self.world_width,
             ground_y=self.GROUND_COLLISION_Y,
         )
+        self.sword = Sword()
 
         self.mobs = self._create_mobs()
 
@@ -95,6 +97,16 @@ class World:
         """
         self.player.handle_event(event)
 
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            self.sword.handle_mouse_down(
+                event.button
+            )
+
+        elif event.type == pygame.MOUSEBUTTONUP:
+            self.sword.handle_mouse_up(
+                event.button
+            )
+
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_F1:
                 self.show_debug = not self.show_debug
@@ -110,6 +122,7 @@ class World:
             delta_time,
             self.platforms,
         )
+        self.sword.update(delta_time)
 
         for mob in self.mobs:
             mob.update(delta_time, self.player)
@@ -145,11 +158,26 @@ class World:
                 alpha,
             )
 
+        self.sword.render_behind_player(
+            screen,
+            self.player,
+            camera_x,
+            alpha,
+        )
+
         self.player.render(
             screen,
             camera_x,
             alpha,
         )
+
+        self.sword.render_active(
+            screen,
+            self.player,
+            camera_x,
+            alpha,
+        )
+                
 
         self._render_hud(screen)
 
