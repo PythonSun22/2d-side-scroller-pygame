@@ -346,6 +346,10 @@ class Sword:
             player.get_interpolated_feet_position(alpha)
         )
 
+        player_y += (
+            player.transform_render_offset_y
+        )
+
         if self.state == SwordState.SHEATHED:
             if player.facing_right:
                 side = 1
@@ -403,6 +407,10 @@ class Sword:
 
         player_x, player_y = (
             player.get_interpolated_feet_position(alpha)
+        )
+
+        player_y += (
+            player.transform_render_offset_y
         )
 
         offset_x, offset_y, angle = (
@@ -730,4 +738,9 @@ class Sword:
             self.DEBUG_HITBOX_COLOR,
             debug_rect,
             width=2,
+        )
+
+    def force_sheathed(self) -> None:
+        self._change_state(
+            SwordState.SHEATHED
         )

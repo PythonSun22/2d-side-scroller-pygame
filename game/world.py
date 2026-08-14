@@ -9,6 +9,7 @@ from game.world_background import WorldBackground
 from game.mob import Mob
 from game.player_tuning import PlayerTuning
 from game.weapons.sword import Sword
+from game.pickups.fire_powerup import FirePowerUp
 
 
 class World:
@@ -51,6 +52,10 @@ class World:
         self.debug_font = pygame.font.Font(None, 28)
         self.show_debug = True
 
+        self.fire_powerup = FirePowerUp(
+            position = (1750, 445)
+        )
+
     def _create_mobs(self) -> list[Mob]:
         return [
             Mob(
@@ -92,9 +97,13 @@ class World:
         self,
         event: pygame.event.Event,
     ) -> None:
-        """
-        Forward gameplay-specific events to world objects.
-        """
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_F1:
+                self.show_debug = not self.show_debug
+
+        if self.player.is_transforming:
+            return
+
         self.player.handle_event(event)
 
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -106,26 +115,68 @@ class World:
             self.sword.handle_mouse_up(
                 event.button
             )
-
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_F1:
-                self.show_debug = not self.show_debug
-
+            
     def update(self, delta_time: float) -> None:
+        # Preserve interpolation state.
         self.player.begin_physics_step()
         self.camera.begin_physics_step()
 
         for mob in self.mobs:
             mob.begin_physics_step()
 
+        if not self.fire_powerup.collected:
+            self.fire_powerup.begin_physics_step()
+
+        # ---------------------------------------------------------
+        # TRANSFORMATION FREEZE
+        # ---------------------------------------------------------
+
+        if self.player.is_transforming:
+            self.player.update_fire_transformation(
+                delta_time
+            )
+            return
+
+        # ---------------------------------------------------------
+        # PLAYER
+        # ---------------------------------------------------------
+
         self.player.update(
             delta_time,
             self.platforms,
         )
+
         self.sword.update(delta_time)
 
+        # ---------------------------------------------------------
+        # FIRE POWER-UP
+        # ---------------------------------------------------------
+
+        if not self.fire_powerup.collected:
+            # This MUST run every fixed physics step.
+            self.fire_powerup.update(delta_time)
+
+            if self.player.collision_rect.colliderect(
+                self.fire_powerup.collision_rect
+            ):
+                self._collect_fire_powerup()
+
+                # Transformation begins immediately.
+                return
+
+        # ---------------------------------------------------------
+        # MOBS
+        # ---------------------------------------------------------
+
         for mob in self.mobs:
-            mob.update(delta_time, self.player)
+            mob.update(
+                delta_time,
+                self.player,
+            )
+
+        # ---------------------------------------------------------
+        # COMBAT
+        # ---------------------------------------------------------
 
         self._handle_sword_combat()
         self._handle_mob_contact()
@@ -135,6 +186,10 @@ class World:
             for mob in self.mobs
             if not mob.should_remove
         ]
+
+        # ---------------------------------------------------------
+        # CAMERA
+        # ---------------------------------------------------------
 
         self.camera.update(
             self.player.collision_rect
@@ -158,6 +213,12 @@ class World:
                 camera_x,
             )
 
+        self.fire_powerup.render(
+            screen,
+            camera_x,
+            alpha,
+        )
+
         for mob in self.mobs:
             mob.render(
                 screen,
@@ -165,6 +226,48 @@ class World:
                 alpha,
             )
 
+        self.player.render_fire_transformation_aura(
+            screen,
+            camera_x,
+            alpha,
+        )
+
+        if self.player.is_transforming:
+            player_x, player_y = (
+                self.player.get_interpolated_feet_position(
+                    alpha
+                )
+            )
+
+            player_y += (
+                self.player.transform_render_offset_y
+            )
+
+            flame_text = self.debug_font.render(
+                "Flame On!",
+                True,
+                (255, 165, 0),
+            )
+
+            flame_rect = flame_text.get_rect(
+                midleft=(
+                    round(
+                        player_x
+                        - camera_x
+                        + 40
+                    ),
+                    round(
+                        player_y
+                        - 45
+                    ),
+                )
+            )
+
+            screen.blit(
+                flame_text,
+                flame_rect,
+            )
+                
         self.sword.render_behind_player(
             screen,
             self.player,
@@ -302,4 +405,9 @@ class World:
             if damage_applied:
                 self.sword.register_hit(mob)
 
-    
+    def _collect_fire_powerup(self) -> None:
+        self.fire_powerup.collect()
+
+        self.sword.force_sheathed()
+
+        self.player.start_fire_transformation()

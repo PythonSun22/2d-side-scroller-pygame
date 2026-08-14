@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import pygame
-
+import math
 from game.assets import assets
 from game.player_tuning import PlayerTuning
 from game.platform import Platform
+
 
 class Player:
     """
@@ -24,16 +25,31 @@ class Player:
         "greenFreddy05.png",
     )
 
+    POWERED_WALK_IMAGES = (
+        "main_char_walk_1.png",
+        "main_char_walk_2.png",
+        "main_char_walk_3.png",
+        "main_char_walk_4.png",
+        "main_char_walk_5.png",
+    )
+
     def __init__(
         self,
         position: tuple[int, int],
         world_width: int,
         ground_y: int,
     ) -> None:
-        self.frames = [
+        self.normal_frames = [
             assets.load_image(filename, alpha=True)
             for filename in self.WALK_IMAGES
         ]
+
+        self.powered_frames = [
+            assets.load_image(filename, alpha=True)
+            for filename in self.POWERED_WALK_IMAGES
+        ]
+
+        self.frames = self.normal_frames
 
         self.current_frame = 0
         self.image = self.frames[self.current_frame]
@@ -74,6 +90,12 @@ class Player:
 
         self.invulnerability_timer = 0.0
         self.knockback_velocity_x = 0.0
+
+        self.has_fire_power = False
+        self.is_transforming = False
+
+        self.transform_elapsed = 0.0
+        self.transform_render_offset_y = 0.0
 
         self._synchronize_rectangles()
 
@@ -366,7 +388,7 @@ class Player:
                     + image_offset_x
                     - camera_x
                 ),
-                round(render_feet_y),
+                round(render_feet_y + self.transform_render_offset_y),
             )
         )
 
@@ -505,3 +527,171 @@ class Player:
                 self.knockback_velocity_x + deceleration,
             )
 
+    def start_fire_transformation(self) -> None:
+        if self.has_fire_power or self.is_transforming:
+            return
+
+        self.is_transforming = True
+        self.transform_elapsed = 0.0
+        self.transform_render_offset_y = 0.0
+
+        self.is_moving = False
+        self.velocity_y = 0.0
+        self.knockback_velocity_x = 0.0
+        self.jump_requested = False
+
+        self.current_frame = 0
+
+        self._set_transformation_image(
+            self.normal_frames[0]
+        )
+
+
+    def update_fire_transformation(
+        self,
+        delta_time: float,
+    ) -> None:
+        if not self.is_transforming:
+            return
+
+        self.transform_elapsed += delta_time
+
+        duration = (
+            PlayerTuning.FIRE_TRANSFORM_DURATION
+        )
+
+        progress = min(
+            1.0,
+            self.transform_elapsed / duration,
+        )
+
+        # Visual rise and fall only.
+        # Freddy's physics coordinates never move.
+        self.transform_render_offset_y = (
+            -PlayerTuning.FIRE_TRANSFORM_FLOAT_HEIGHT
+            * math.sin(math.pi * progress)
+        )
+
+        # Flash between normal and powered forms.
+        if progress < 0.18:
+            frame = self.normal_frames[0]
+
+        elif progress < 0.75:
+            flash_index = int(
+                self.transform_elapsed
+                * PlayerTuning.FIRE_TRANSFORM_FLASH_RATE
+            )
+
+            if flash_index % 2 == 0:
+                frame = self.powered_frames[0]
+            else:
+                frame = self.normal_frames[0]
+
+        else:
+            frame = self.powered_frames[0]
+
+        self._set_transformation_image(frame)
+
+        if progress >= 1.0:
+            self._finish_fire_transformation()
+
+
+    def _finish_fire_transformation(self) -> None:
+        self.is_transforming = False
+        self.has_fire_power = True
+
+        self.transform_elapsed = 0.0
+        self.transform_render_offset_y = 0.0
+
+        self.frames = self.powered_frames
+        self.current_frame = 0
+
+        self._refresh_image()
+
+
+    def _set_transformation_image(
+        self,
+        frame: pygame.Surface,
+    ) -> None:
+        if self.facing_right:
+            self.image = frame
+        else:
+            self.image = pygame.transform.flip(
+                frame,
+                True,
+                False,
+            )
+    def render_fire_transformation_aura(
+        self,
+        screen: pygame.Surface,
+        camera_x: float,
+        alpha: float,
+    ) -> None:
+        if not self.is_transforming:
+            return
+
+        render_x, render_y = (
+            self.get_interpolated_feet_position(alpha)
+        )
+
+        render_y += self.transform_render_offset_y
+
+        progress = min(
+            1.0,
+            self.transform_elapsed
+            / PlayerTuning.FIRE_TRANSFORM_DURATION,
+        )
+
+        pulse = (
+            0.5
+            + 0.5
+            * math.sin(
+                self.transform_elapsed * 14.0
+            )
+        )
+
+        radius = int(
+            42
+            + 12 * progress
+            + 5 * pulse
+        )
+
+        aura = pygame.Surface(
+            (
+                radius * 2,
+                radius * 2,
+            ),
+            pygame.SRCALPHA,
+        )
+
+        pygame.draw.circle(
+            aura,
+            (
+                80,
+                255,
+                120,
+                int(45 + 80 * progress),
+            ),
+            (
+                radius,
+                radius,
+            ),
+            radius,
+        )
+
+        screen.blit(
+            aura,
+            (
+                round(
+                    render_x
+                    - camera_x
+                    - radius
+                ),
+                round(
+                    render_y
+                    - 45
+                    - radius
+                ),
+            ),
+            special_flags=pygame.BLEND_RGBA_ADD,
+        )
