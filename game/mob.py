@@ -73,6 +73,11 @@ class Mob:
             MobTuning.HITBOX_HEIGHT,
         )
 
+        self.health = MobTuning.MAX_HEALTH
+
+        self.knockback_velocity_x = 0.0
+        self.should_remove = False
+
         self._synchronize_collision_rect()
 
     def begin_physics_step(self) -> None:
@@ -84,11 +89,19 @@ class Mob:
         delta_time: float,
         player,
     ) -> None:
-        self.state.update(delta_time, player)
+        self.state.update(
+            delta_time,
+            player,
+        )
+
+        self._apply_knockback(delta_time)
         self._update_animation(delta_time)
         self._synchronize_collision_rect()
 
     def _update_animation(self, delta_time: float) -> None:
+        if self.is_defeated:
+            return
+        
         if not self.is_moving:
             self.current_frame = 0
             self.animation_elapsed = 0.0
@@ -249,3 +262,65 @@ class Mob:
             self.set_direction(1)
         elif target_x < self.feet_x:
             self.set_direction(-1)
+
+
+    @property
+    def is_defeated(self) -> bool:
+        return self.health <= 0
+
+    def take_damage(
+        self,
+        amount: int,
+        knockback_direction: int,
+        knockback_speed: float,
+    ) -> bool:
+        if amount <= 0 or self.is_defeated:
+            return False
+
+        self.health = max(
+            0,
+            self.health - amount,
+        )
+
+        self.knockback_velocity_x = (
+            knockback_direction
+            * knockback_speed
+        )
+
+        if self.health <= 0:
+            from game.ai.death_state import DeathState
+
+            self.change_state(
+                DeathState(self)
+            )
+
+        return True
+
+    def _apply_knockback(
+        self,
+        delta_time: float,
+    ) -> None:
+        if self.knockback_velocity_x == 0.0:
+            return
+
+        self.feet_x += (
+            self.knockback_velocity_x
+            * delta_time
+        )
+
+        deceleration = (
+            MobTuning.KNOCKBACK_DECELERATION
+            * delta_time
+        )
+
+        if self.knockback_velocity_x > 0.0:
+            self.knockback_velocity_x = max(
+                0.0,
+                self.knockback_velocity_x - deceleration,
+            )
+
+        else:
+            self.knockback_velocity_x = min(
+                0.0,
+                self.knockback_velocity_x + deceleration,
+            )

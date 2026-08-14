@@ -6,6 +6,8 @@ import pygame
 
 from game.assets import assets
 
+import math
+
 
 class SwordState(Enum):
     SHEATHED = auto()
@@ -42,7 +44,7 @@ class Sword:
 
     DOWN_SLASH_DURATION = 0.18
     COMBO_WINDOW_DURATION = 0.24
-    UP_SLASH_DURATION = 0.16
+    UP_SLASH_DURATION = 0.18
 
     RETURN_DURATION = 0.16
 
@@ -71,6 +73,24 @@ class Sword:
     DOWN_END_X_OFFSET = 50
     DOWN_END_Y_OFFSET = -15
 
+
+    # Combat
+    DOWN_HITBOX_WIDTH = 52
+    DOWN_HITBOX_HEIGHT = 72
+
+    UP_HITBOX_WIDTH = 48
+    UP_HITBOX_HEIGHT = 68
+
+    MIN_DOWN_DAMAGE = 1
+    MAX_DOWN_DAMAGE = 3
+
+    UP_DAMAGE = 1
+
+    DOWN_KNOCKBACK_SPEED = 150.0
+    UP_KNOCKBACK_SPEED = 460.0
+
+    DEBUG_HITBOX_COLOR = (80, 255, 120)
+
     def __init__(self) -> None:
         image = assets.load_image(
             self.IMAGE_PATH,
@@ -90,6 +110,9 @@ class Sword:
 
         # True while the mouse button that began the charge is held.
         self.attack_button_held = False
+        self.released_charge_ratio = 0.0
+
+        self._hit_target_ids: set[int] = set()
 
     # ------------------------------------------------------------------
     # Input
@@ -153,6 +176,13 @@ class Sword:
             self.charge_elapsed = 0.0
             self.attack_button_held = False
 
+        elif new_state == SwordState.DOWN_SLASH:
+            self.released_charge_ratio = self.charge_ratio
+            self._hit_target_ids.clear()
+
+        elif new_state == SwordState.UP_SLASH:
+            self._hit_target_ids.clear()
+
     def update(self, delta_time: float) -> None:
         self.state_elapsed += delta_time
 
@@ -212,6 +242,92 @@ class Sword:
     # ------------------------------------------------------------------
     # Rendering
     # ------------------------------------------------------------------
+
+    def _draw_charge_glow(
+        self,
+        screen: pygame.Surface,
+        sword_image: pygame.Surface,
+        sword_rect: pygame.Rect,
+    ) -> None:
+        if self.state not in (
+            SwordState.CHARGING,
+            SwordState.DOWN_SLASH,
+        ):
+            return
+
+        if self.state == SwordState.CHARGING:
+            charge = self.charge_ratio
+        else:
+            charge = self.released_charge_ratio
+
+        # Brighter baseline glow.
+        padding = int(10 + 14 * charge)
+        alpha = int(80 + 140 * charge)
+
+        # At full charge, pulse the glow size and brightness.
+        pulse = 0.0
+
+        if (
+            self.state == SwordState.CHARGING
+            and charge >= 1.0
+        ):
+            pulse = (
+                0.5
+                + 0.5
+                * math.sin(self.state_elapsed * 10.0)
+            )
+
+            padding += int(8 * pulse)
+            alpha = min(
+                255,
+                alpha + int(35 * pulse),
+            )
+
+        glow_surface = pygame.Surface(
+            (
+                sword_rect.width + padding * 2,
+                sword_rect.height + padding * 2,
+            ),
+            pygame.SRCALPHA,
+        )
+
+        glow_image = sword_image.copy()
+
+        glow_image.fill(
+            (100, 255, 140, alpha),
+            special_flags=pygame.BLEND_RGBA_MULT,
+        )
+
+        glow_image = pygame.transform.smoothscale(
+            glow_image,
+            (
+                sword_rect.width + padding,
+                sword_rect.height + padding,
+            ),
+        )
+
+        glow_rect = glow_image.get_rect(
+            center=(
+                glow_surface.get_width() // 2,
+                glow_surface.get_height() // 2,
+            )
+        )
+
+        glow_surface.blit(
+            glow_image,
+            glow_rect,
+        )
+
+        screen.blit(
+            glow_surface,
+            (
+                sword_rect.centerx
+                - glow_surface.get_width() // 2,
+                sword_rect.centery
+                - glow_surface.get_height() // 2,
+            ),
+            special_flags=pygame.BLEND_RGBA_ADD,
+        )
 
     def render_behind_player(
         self,
@@ -434,6 +550,12 @@ class Sword:
             )
         )
 
+        self._draw_charge_glow(
+            screen,
+            rotated_image,
+            rect,
+        )
+
         screen.blit(
             rotated_image,
             rect,
@@ -496,3 +618,116 @@ class Sword:
         perfectly linear movement.
         """
         return 1.0 - (1.0 - progress) ** 2
+
+
+    @property
+    def is_attack_active(self) -> bool:
+        return self.state in (
+            SwordState.DOWN_SLASH,
+            SwordState.UP_SLASH,
+        )
+
+
+    @property
+    def current_damage(self) -> int:
+        if self.state == SwordState.DOWN_SLASH:
+            damage_range = (
+                self.MAX_DOWN_DAMAGE
+                - self.MIN_DOWN_DAMAGE
+            )
+
+            return (
+                self.MIN_DOWN_DAMAGE
+                + int(
+                    self.released_charge_ratio
+                    * damage_range
+                )
+            )
+
+        if self.state == SwordState.UP_SLASH:
+            return self.UP_DAMAGE
+
+        return 0
+
+
+    @property
+    def current_knockback_speed(self) -> float:
+        if self.state == SwordState.DOWN_SLASH:
+            return self.DOWN_KNOCKBACK_SPEED
+
+        if self.state == SwordState.UP_SLASH:
+            return self.UP_KNOCKBACK_SPEED
+
+        return 0.0
+
+
+    @property
+    def knockback_direction(self) -> int:
+        return self.attack_side.value
+
+    def get_attack_hitbox(
+        self,
+        player,
+    ) -> pygame.Rect | None:
+        if not self.is_attack_active:
+            return None
+
+        offset_x, offset_y, _ = (
+            self._get_active_transform()
+        )
+
+        if self.state == SwordState.DOWN_SLASH:
+            width = self.DOWN_HITBOX_WIDTH
+            height = self.DOWN_HITBOX_HEIGHT
+        else:
+            width = self.UP_HITBOX_WIDTH
+            height = self.UP_HITBOX_HEIGHT
+
+        hitbox = pygame.Rect(
+            0,
+            0,
+            width,
+            height,
+        )
+
+        hitbox.center = (
+            round(player.feet_x + offset_x),
+            round(player.feet_y + offset_y),
+        )
+
+        return hitbox
+
+    def can_hit(self, target) -> bool:
+        return id(target) not in self._hit_target_ids
+
+
+    def register_hit(self, target) -> None:
+        self._hit_target_ids.add(
+            id(target)
+        )
+
+
+    def render_debug_hitbox(
+        self,
+        screen: pygame.Surface,
+        player,
+        camera_x: float,
+    ) -> None:
+        hitbox = self.get_attack_hitbox(
+            player
+        )
+
+        if hitbox is None:
+            return
+
+        debug_rect = hitbox.move(
+            -round(camera_x),
+            0,
+        )
+
+        pygame.draw.rect(
+            screen,
+            self.DEBUG_HITBOX_COLOR,
+            debug_rect,
+            width=2,
+        )

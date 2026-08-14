@@ -127,7 +127,14 @@ class World:
         for mob in self.mobs:
             mob.update(delta_time, self.player)
 
+        self._handle_sword_combat()
         self._handle_mob_contact()
+
+        self.mobs = [
+            mob
+            for mob in self.mobs
+            if not mob.should_remove
+        ]
 
         self.camera.update(
             self.player.collision_rect
@@ -210,6 +217,12 @@ class World:
             alpha,
         )
 
+        self.sword.render_debug_hitbox(
+            screen,
+            self.player,
+            camera_x,
+        )
+
         debug_surface = self.debug_font.render(
             (
                 f"World X: {round(self.player.feet_x)}  "
@@ -227,6 +240,9 @@ class World:
 
     def _handle_mob_contact(self) -> None:
         for mob in self.mobs:
+            if mob.is_defeated:
+                continue
+
             if self.player.collision_rect.colliderect(
                 mob.collision_rect
             ):
@@ -252,3 +268,38 @@ class World:
             health_surface,
             (20, 55),
         )
+
+    def _handle_sword_combat(self) -> None:
+        sword_hitbox = self.sword.get_attack_hitbox(
+            self.player
+        )
+
+        if sword_hitbox is None:
+            return
+
+        for mob in self.mobs:
+            if mob.is_defeated:
+                continue
+
+            if not self.sword.can_hit(mob):
+                continue
+
+            if not sword_hitbox.colliderect(
+                mob.collision_rect
+            ):
+                continue
+
+            damage_applied = mob.take_damage(
+                amount=self.sword.current_damage,
+                knockback_direction=(
+                    self.sword.knockback_direction
+                ),
+                knockback_speed=(
+                    self.sword.current_knockback_speed
+                ),
+            )
+
+            if damage_applied:
+                self.sword.register_hit(mob)
+
+    
