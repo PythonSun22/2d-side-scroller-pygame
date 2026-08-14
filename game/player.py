@@ -166,7 +166,7 @@ class Player:
         if event.type != pygame.KEYDOWN:
             return
 
-        if event.key in (pygame.K_SPACE, pygame.K_UP, pygame.K_w):
+        if event.key in (pygame.K_UP, pygame.K_w):
             self.jump_requested = True
 
     def _update_coyote_timer(self, delta_time: float) -> None:

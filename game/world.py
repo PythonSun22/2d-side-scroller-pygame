@@ -10,6 +10,7 @@ from game.mob import Mob
 from game.player_tuning import PlayerTuning
 from game.weapons.sword import Sword
 from game.pickups.fire_powerup import FirePowerUp
+from game.weapons.fireball import Fireball
 
 
 class World:
@@ -56,12 +57,32 @@ class World:
             position = (1750, 445)
         )
 
+        self.fireballs: list[Fireball] = []
+
     def _create_mobs(self) -> list[Mob]:
         return [
             Mob(
-                position=(1350, self.GROUND_COLLISION_Y),
+                position=(1350, 
+                self.GROUND_COLLISION_Y
+            ),
                 patrol_left=1250,
                 patrol_right=1550,
+            ),
+             Mob(
+            position=(
+                1900,
+                self.GROUND_COLLISION_Y,
+            ),
+            patrol_left=1780,
+            patrol_right=2050,
+            ),
+            Mob(
+                position=(
+                    2350,
+                    self.GROUND_COLLISION_Y,
+                ),
+                patrol_left=2220,
+                patrol_right=2500,
             ),
         ]
 
@@ -104,6 +125,10 @@ class World:
         if self.player.is_transforming:
             return
 
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                self._spawn_fireball()
+
         self.player.handle_event(event)
 
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -126,6 +151,9 @@ class World:
 
         if not self.fire_powerup.collected:
             self.fire_powerup.begin_physics_step()
+
+        for fireball in self.fireballs:
+            fireball.begin_physics_step()
 
         # ---------------------------------------------------------
         # TRANSFORMATION FREEZE
@@ -175,11 +203,19 @@ class World:
             )
 
         # ---------------------------------------------------------
+        # Fireballs
+        # ---------------------------------------------------------
+
+        for fireball in self.fireballs:
+            fireball.update(delta_time)
+
+        # ---------------------------------------------------------
         # COMBAT
         # ---------------------------------------------------------
 
         self._handle_sword_combat()
         self._handle_mob_contact()
+        self._handle_fireball_combat()
 
         self.mobs = [
             mob
@@ -187,6 +223,13 @@ class World:
             if not mob.should_remove
         ]
 
+        self.fireballs = [
+            fireball for fireball in self.fireballs
+            if (
+                not fireball.is_finished
+                and -100 <= fireball.x <= self.world_width + 100
+            )
+        ]
         # ---------------------------------------------------------
         # CAMERA
         # ---------------------------------------------------------
@@ -267,7 +310,14 @@ class World:
                 flame_text,
                 flame_rect,
             )
-                
+
+        for fireball in self.fireballs:
+            fireball.render(
+                screen,
+                camera_x,
+                alpha,
+            )
+        
         self.sword.render_behind_player(
             screen,
             self.player,
@@ -312,6 +362,12 @@ class World:
                 screen,
                 camera_x,
                 alpha,
+            )
+
+        for fireball in self.fireballs:
+            fireball.render_debug(
+                screen,
+                camera_x,
             )
 
         self.player.render_debug_hitbox(
@@ -411,3 +467,57 @@ class World:
         self.sword.force_sheathed()
 
         self.player.start_fire_transformation()
+
+    def _spawn_fireball(self) -> None:
+        if not self.player.has_fire_power:
+            return
+
+        if self.player.facing_right:
+            direction = 1
+            spawn_x = self.player.feet_x + 30
+        else:
+            direction = -1
+            spawn_x = self.player.feet_x - 30
+
+        spawn_y = self.player.feet_y - 45
+
+        self.fireballs.append(
+            Fireball(
+                position=(
+                    spawn_x,
+                    spawn_y,
+                ),
+                direction=direction,
+                ground_y=self.GROUND_COLLISION_Y,
+            )
+        )
+
+    def _handle_fireball_combat(self) -> None:
+        for fireball in self.fireballs:
+            if not fireball.is_active:
+                continue
+
+            for mob in self.mobs:
+                if mob.is_defeated:
+                    continue
+
+                if not fireball.collision_rect.colliderect(
+                    mob.collision_rect
+                ):
+                    continue
+
+                damage_applied = mob.take_damage(
+                    amount=Fireball.DAMAGE,
+                    knockback_direction=(
+                        fireball.direction
+                    ),
+                    knockback_speed=(
+                        Fireball.KNOCKBACK_SPEED
+                    ),
+                )
+
+                if damage_applied:
+                    fireball.start_explosion()
+
+                # One projectile can hit only one mob.
+                break
