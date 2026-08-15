@@ -24,6 +24,9 @@ class World:
     PLAYER_START_POSITION = (300, 375)
     GROUND_COLLISION_Y = 476
 
+    BOSS_ARENA_WIDTH = 1500
+    BOSS_ARENA_GLOW_WIDTH = 70
+
     def __init__(
         self,
         screen_size: tuple[int, int],
@@ -33,6 +36,17 @@ class World:
         self.background = WorldBackground(screen_size)
 
         self.world_width = self.background.world_width
+
+        self.boss_arena_left = max(
+            0,
+            self.world_width - self.BOSS_ARENA_WIDTH,
+        )
+
+        self.boss_arena_right = float(self.world_width)
+        self.boss_arena_approach = False
+        self.boss_arena_locked = False
+
+
 
         self.camera = Camera(
             screen_width=self.screen_width,
@@ -93,6 +107,8 @@ class World:
         These temporary rectangles can later receive visual platform assets
         without changing their collision geometry.
         """
+        arena_x = self.boss_arena_left
+
         return [
             Platform(
                 pygame.Rect(520, 365, 180, 24)
@@ -111,6 +127,35 @@ class World:
             ),
             Platform(
                 pygame.Rect(2400, 335, 220, 24)
+            ),
+            # Boss arena: low-left
+            Platform(
+                pygame.Rect(
+                    round(arena_x + 140),
+                    365,
+                    230,
+                    24,
+                )
+            ),
+
+            # Boss arena: long middle platform
+            Platform(
+                pygame.Rect(
+                    round(arena_x + 470),
+                    285,
+                    610,
+                    24,
+                )
+            ),
+
+            # Boss arena: high-right
+            Platform(
+                pygame.Rect(
+                    round(arena_x + 1120),
+                    205,
+                    220,
+                    24,
+                )
             ),
         ]
 
@@ -173,6 +218,8 @@ class World:
             delta_time,
             self.platforms,
         )
+
+        self._update_boss_arena()
 
         self.sword.update(delta_time)
 
@@ -343,6 +390,8 @@ class World:
 
         if self.show_debug:
             self._render_debug(screen, camera_x, alpha)
+
+        self._render_boss_arena_glow(screen)
 
     def _render_debug(
         self,
@@ -521,3 +570,132 @@ class World:
 
                 # One projectile can hit only one mob.
                 break
+
+    def _update_boss_arena(self) -> None:
+        # Freddy has entered the approach to the boss arena.
+        if (
+            not self.boss_arena_approach
+            and self.player.feet_x >= self.boss_arena_left
+        ):
+            self.boss_arena_approach = True
+
+        # During the approach, allow the normal camera system to keep
+        # scrolling until it naturally lines up with the arena.
+        if (
+            self.boss_arena_approach
+            and not self.boss_arena_locked
+        ):
+            target_camera_x = self.boss_arena_left
+
+            if self.camera.x >= target_camera_x - 1.0:
+                self._lock_boss_arena()
+
+        if self.boss_arena_locked:
+            self._keep_player_inside_boss_arena()
+
+    def _lock_boss_arena(self) -> None:
+        self.boss_arena_locked = True
+
+        self.camera.lock_to(
+            self.boss_arena_left
+        )
+
+    def _keep_player_inside_boss_arena(self) -> None:
+        if self.player.collision_rect.left >= self.boss_arena_left:
+            return
+
+        correction = (
+            self.boss_arena_left
+            - self.player.collision_rect.left
+        )
+
+        self.player.feet_x += correction
+
+        # Refresh Freddy's authoritative rectangles after correcting him.
+        self.player.move_horizontal_correction(correction)
+
+    def _render_boss_arena_glow(
+        self,
+        screen: pygame.Surface,
+    ) -> None:
+        if not self.boss_arena_locked:
+            return
+
+        glow_width = self.BOSS_ARENA_GLOW_WIDTH
+
+        overlay = pygame.Surface(
+            (
+                self.screen_width,
+                self.screen_height,
+            ),
+            pygame.SRCALPHA,
+        )
+
+        for offset in range(glow_width):
+            progress = offset / glow_width
+
+            alpha = int(
+                65 * (1.0 - progress)
+            )
+
+            color = (
+                170,
+                20,
+                25,
+                alpha,
+            )
+
+            # Left edge
+            pygame.draw.line(
+                overlay,
+                color,
+                (offset, offset),
+                (
+                    offset,
+                    self.screen_height - offset,
+                ),
+            )
+
+            # Right edge
+            pygame.draw.line(
+                overlay,
+                color,
+                (
+                    self.screen_width - 1 - offset,
+                    offset,
+                ),
+                (
+                    self.screen_width - 1 - offset,
+                    self.screen_height - offset,
+                ),
+            )
+
+            # Top edge
+            pygame.draw.line(
+                overlay,
+                color,
+                (offset, offset),
+                (
+                    self.screen_width - offset,
+                    offset,
+                ),
+            )
+
+            # Bottom edge
+            pygame.draw.line(
+                overlay,
+                color,
+                (
+                    offset,
+                    self.screen_height - 1 - offset,
+                ),
+                (
+                    self.screen_width - offset,
+                    self.screen_height - 1 - offset,
+                ),
+            )
+
+        screen.blit(
+            overlay,
+            (0, 0),
+        )

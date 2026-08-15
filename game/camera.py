@@ -26,6 +26,8 @@ class Camera:
         self.left_dead_zone = int(screen_width * 0.35)
         self.right_dead_zone = int(screen_width * 0.60)
 
+        self.locked_x: float | None = None
+
     @property
     def max_x(self) -> float:
         return float(
@@ -57,6 +59,10 @@ class Camera:
         """
         target_screen_x = target_rect.centerx - self.x
 
+        if self.locked_x is not None:
+            self.x = self.locked_x
+            return
+
         if target_screen_x > self.right_dead_zone:
             self.x = (
                 target_rect.centerx
@@ -82,3 +88,18 @@ class Camera:
             -round(self.x),
             0,
         )
+
+    def lock_to(self, x: float) -> None:
+        self.locked_x = max(
+            0.0,
+            min(float(x), self.max_x),
+        )
+
+        # Prevent interpolation from visibly sliding in from the old camera
+        # position on the first locked frame.
+        self.x = self.locked_x
+        self.previous_x = self.x
+
+
+    def unlock(self) -> None:
+        self.locked_x = None

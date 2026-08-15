@@ -142,6 +142,16 @@ class Player:
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
             direction += 1
 
+        is_sprinting = (
+            keys[pygame.K_LSHIFT]
+            or keys[pygame.K_RSHIFT]
+        )
+
+        move_speed = PlayerTuning.MOVE_SPEED
+
+        if is_sprinting:
+            move_speed *= PlayerTuning.SPRINT_MULTIPLIER
+
         self.is_moving = direction != 0
 
         if direction < 0:
@@ -152,7 +162,7 @@ class Player:
         self._update_coyote_timer(delta_time)
         self._handle_jump()
 
-        self._move_horizontally(direction, delta_time)
+        self._move_horizontally(direction, delta_time, move_speed)
 
         self._apply_horizontal_knockback(delta_time)
 
@@ -264,10 +274,11 @@ class Player:
         self,
         direction: int,
         delta_time: float,
+        move_speed: float,
     ) -> None:
         self.feet_x += (
             direction
-            * PlayerTuning.MOVEMENT_SPEED
+            * move_speed
             * delta_time
         )
 
@@ -531,6 +542,7 @@ class Player:
         if self.has_fire_power or self.is_transforming:
             return
 
+        self.invulnerability_timer = 0.0
         self.is_transforming = True
         self.transform_elapsed = 0.0
         self.transform_render_offset_y = 0.0
@@ -695,3 +707,10 @@ class Player:
             ),
             special_flags=pygame.BLEND_RGBA_ADD,
         )
+
+    def move_horizontal_correction(
+        self,
+        amount: float,
+    ) -> None:
+        self.feet_x += amount
+        self._synchronize_rectangles()
