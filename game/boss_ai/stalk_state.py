@@ -31,9 +31,35 @@ class StalkState(BossState):
             - boss.feet_x
         )
 
+        difference_y = (
+            boss.feet_y 
+            - player.feet_y
+        )
+
         distance_to_player = abs(
             difference_x
         )
+
+        # -----------------------------------------------------
+        # STALK
+        # -----------------------------------------------------
+        if (
+            difference_y
+            >= BossTuning.LEAP_TRIGGER_HEIGHT
+            and boss.is_on_ground
+        ):
+            from game.boss_ai.leap_state import (
+                LeapState,
+            )
+
+            boss.change_state(
+                LeapState(
+                    boss,
+                    player.feet_x,
+                )
+            )
+
+            return
 
         # -----------------------------------------------------
         # STALK

@@ -178,6 +178,9 @@ class World:
             if event.key == pygame.K_F1:
                 self.show_debug = not self.show_debug
 
+            if event.key == pygame.K_F2:
+                self._debug_teleport_to_boss()
+
         if self.player.is_transforming:
             return
 
@@ -269,6 +272,7 @@ class World:
         self.boss.update(
             delta_time,
             self.player,
+            self.platforms,
         )
 
         # ---------------------------------------------------------
@@ -283,8 +287,10 @@ class World:
         # ---------------------------------------------------------
 
         self._handle_sword_combat()
+        self._handle_sword_boss_combat()
         self._handle_mob_contact()
         self._handle_fireball_combat()
+        self._handle_fireball_boss_combat()
         self._handle_boss_contact()
 
         self.mobs = [
@@ -419,6 +425,18 @@ class World:
 
         if self.show_debug:
             self._render_debug(screen, camera_x, alpha)
+
+        if self.boss.is_active and not self.boss.is_defeated:
+            boss_health = self.debug_font.render(
+                f"Boss: {self.boss.health}/{BossTuning.MAX_HEALTH}",
+                True,
+                (255, 90, 90),
+            )
+
+            screen.blit(
+                boss_health,
+                (20, 85),
+            )
 
         self._render_boss_arena_glow(screen)
 
@@ -738,10 +756,11 @@ class World:
             (0, 0),
         )
 
-    def _handle_boss_contact(
-        self,
-    ) -> None:
-        if not self.boss.is_active:
+    def _handle_boss_contact(self) -> None:
+        if (
+            not self.boss.is_active
+            or self.boss.is_defeated
+        ):
             return
 
         if self.player.collision_rect.colliderect(
@@ -751,3 +770,112 @@ class World:
                 amount=BossTuning.CONTACT_DAMAGE,
                 source_x=self.boss.feet_x,
             )
+
+    def _handle_sword_boss_combat(self) -> None:
+        if self.boss.is_defeated:
+            return
+
+        sword_hitbox = self.sword.get_attack_hitbox(
+            self.player
+        )
+
+        if sword_hitbox is None:
+            return
+
+        if not self.sword.can_hit(self.boss):
+            return
+
+        if not sword_hitbox.colliderect(
+            self.boss.collision_rect
+        ):
+            return
+
+        if self.boss.receive_sword_hit(
+            amount=self.sword.current_damage,
+            direction=self.sword.knockback_direction,
+        ):
+            self.sword.register_hit(
+                self.boss
+            )
+
+    def _handle_fireball_boss_combat(self) -> None:
+        if self.boss.is_defeated:
+            return
+
+        for fireball in self.fireballs:
+            if not fireball.is_active:
+                continue
+
+            if not fireball.collision_rect.colliderect(
+                self.boss.collision_rect
+            ):
+                continue
+
+            if self.boss.receive_fireball_hit(
+                amount=Fireball.DAMAGE,
+            ):
+                fireball.start_explosion()
+
+            break
+
+    def _debug_teleport_to_boss(self) -> None:
+        target_x = self.boss_arena_left + 180
+
+        correction = (
+            target_x
+            - self.player.feet_x
+        )
+
+        self.player.move_horizontal_correction(
+            correction
+        )
+
+        # Keep interpolation from drawing Freddy between
+        # the old location and the boss arena.
+        self.player.previous_feet_x = (
+            self.player.feet_x
+        )
+
+        self.player.previous_feet_y = (
+            self.player.feet_y
+        )
+
+        # Let the normal arena-approach logic take over.
+        self.boss_arena_approach = True
+
+    def receive_sword_hit(
+        self,
+        amount: int,
+        direction: int,
+    ) -> bool:
+        if not self.take_damage(amount):
+            return False
+
+        self.hit_flash_timer = (
+            BossTuning.SWORD_HIT_FLASH_DURATION
+        )
+
+        self.stagger_timer = (
+            BossTuning.SWORD_HIT_STAGGER_DURATION
+        )
+
+        self.knockback_velocity_x = (
+            direction
+            * BossTuning.SWORD_HIT_KNOCKBACK_SPEED
+        )
+
+        return True
+
+
+    def receive_fireball_hit(
+        self,
+        amount: int,
+    ) -> bool:
+        if not self.take_damage(amount):
+            return False
+
+        self.hit_flash_timer = (
+            BossTuning.FIREBALL_HIT_FLASH_DURATION
+        )
+
+        return True

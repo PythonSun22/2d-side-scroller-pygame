@@ -32,7 +32,7 @@ class PlayerTuning:
     COYOTE_TIME = 0.08
 
     # Health and damage
-    MAX_HEALTH = 3
+    MAX_HEALTH = 10
     CONTACT_DAMAGE = 1
 
     INVULNERABILITY_DURATION = 1.0
