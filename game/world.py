@@ -11,6 +11,8 @@ from game.player_tuning import PlayerTuning
 from game.weapons.sword import Sword
 from game.pickups.fire_powerup import FirePowerUp
 from game.weapons.fireball import Fireball
+from game.boss import Boss
+from game.boss_tuning import BossTuning
 
 
 class World:
@@ -45,6 +47,15 @@ class World:
         self.boss_arena_right = float(self.world_width)
         self.boss_arena_approach = False
         self.boss_arena_locked = False
+
+        self.boss = Boss(
+            position=(
+                self.boss_arena_right - 180,
+                self.GROUND_COLLISION_Y,
+            ),
+            arena_left=self.boss_arena_left,
+            arena_right=self.boss_arena_right,
+        )
 
 
 
@@ -194,6 +205,8 @@ class World:
         for mob in self.mobs:
             mob.begin_physics_step()
 
+        self.boss.begin_physics_step()
+
         if not self.fire_powerup.collected:
             self.fire_powerup.begin_physics_step()
 
@@ -250,6 +263,15 @@ class World:
             )
 
         # ---------------------------------------------------------
+        # Boss
+        # ---------------------------------------------------------
+        
+        self.boss.update(
+            delta_time,
+            self.player,
+        )
+
+        # ---------------------------------------------------------
         # Fireballs
         # ---------------------------------------------------------
 
@@ -263,6 +285,7 @@ class World:
         self._handle_sword_combat()
         self._handle_mob_contact()
         self._handle_fireball_combat()
+        self._handle_boss_contact()
 
         self.mobs = [
             mob
@@ -358,6 +381,12 @@ class World:
                 flame_rect,
             )
 
+        self.boss.render(
+            screen,
+            camera_x,
+            alpha,
+        )
+
         for fireball in self.fireballs:
             fireball.render(
                 screen,
@@ -413,6 +442,12 @@ class World:
                 alpha,
             )
 
+        self.boss.render_debug_hitbox(
+            screen,
+            camera_x,
+            alpha,
+        )
+
         for fireball in self.fireballs:
             fireball.render_debug(
                 screen,
@@ -435,6 +470,7 @@ class World:
             (
                 f"World X: {round(self.player.feet_x)}  "
                 f"Camera X: {round(camera_x)}  "
+                f"Boss State: {self.boss.state_name}"
                 "F1: Toggle Debug"
             ),
             True,
@@ -600,6 +636,8 @@ class World:
             self.boss_arena_left
         )
 
+        self.boss.activate()
+
     def _keep_player_inside_boss_arena(self) -> None:
         if self.player.collision_rect.left >= self.boss_arena_left:
             return
@@ -699,3 +737,17 @@ class World:
             overlay,
             (0, 0),
         )
+
+    def _handle_boss_contact(
+        self,
+    ) -> None:
+        if not self.boss.is_active:
+            return
+
+        if self.player.collision_rect.colliderect(
+            self.boss.collision_rect
+        ):
+            self.player.take_damage(
+                amount=BossTuning.CONTACT_DAMAGE,
+                source_x=self.boss.feet_x,
+            )
