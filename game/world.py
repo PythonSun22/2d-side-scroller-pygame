@@ -10,6 +10,7 @@ from game.mob import Mob
 from game.player_tuning import PlayerTuning
 from game.weapons.sword import Sword
 from game.pickups.fire_powerup import FirePowerUp
+from game.pickups.apple import Apple
 from game.weapons.fireball import Fireball
 from game.boss import Boss
 from game.boss_tuning import BossTuning
@@ -79,66 +80,120 @@ class World:
         self.show_debug = True
 
         self.fire_powerup = FirePowerUp(
-            position = (1750, 445)
+            position=(1750, 445)
         )
+
+        self.apples = self._create_apples()
 
         self.fireballs: list[Fireball] = []
 
     def _create_mobs(self) -> list[Mob]:
+        """
+        Authored ground encounters that grow denser toward the boss arena.
+        """
+        arena_x = self.boss_arena_left
+
+        mob_specs = [
+            # Intro: isolated enemies with generous patrol space.
+            (1350, 1240, 1510),
+            (1900, 1780, 2050),
+            (2350, 2220, 2500),
+
+            # Early-middle: begin asking Freddy to handle enemies closer
+            # together while navigating the platform route.
+            (3300, 3180, 3450),
+            (4050, 3920, 4200),
+            (4520, 4400, 4660),
+
+            # Middle: paired encounters and shorter safe gaps.
+            (5550, 5420, 5700),
+            (6000, 5880, 6140),
+            (6900, 6770, 7040),
+            (7420, 7300, 7560),
+
+            # Late game: sustained pressure before the final approach.
+            (8350, 8220, 8500),
+            (8780, 8660, 8920),
+            (9700, 9570, 9850),
+            (10150, 10020, 10290),
+
+            # Pre-boss gauntlet. Keep the final stretch immediately before
+            # arena_x clear so the player gets a short breather.
+            (arena_x - 2600, arena_x - 2730, arena_x - 2470),
+            (arena_x - 2180, arena_x - 2300, arena_x - 2050),
+            (arena_x - 1740, arena_x - 1870, arena_x - 1610),
+        ]
+
         return [
             Mob(
-                position=(1350, 
-                self.GROUND_COLLISION_Y
-            ),
-                patrol_left=1250,
-                patrol_right=1550,
-            ),
-             Mob(
-            position=(
-                1900,
-                self.GROUND_COLLISION_Y,
-            ),
-            patrol_left=1780,
-            patrol_right=2050,
-            ),
-            Mob(
                 position=(
-                    2350,
+                    x,
                     self.GROUND_COLLISION_Y,
                 ),
-                patrol_left=2220,
-                patrol_right=2500,
-            ),
+                patrol_left=left,
+                patrol_right=right,
+            )
+            for x, left, right in mob_specs
         ]
 
     def _create_platforms(self) -> list[Platform]:
         """
-        Build the world's current platform layout.
-
-        These temporary rectangles can later receive visual platform assets
-        without changing their collision geometry.
+        Authored platform route that gradually increases vertical movement
+        and tighter landings as Freddy approaches the boss.
         """
         arena_x = self.boss_arena_left
 
-        return [
+        platform_specs = [
+            # Intro: broad, forgiving staircase.
+            (520, 365, 180, 24),
+            (820, 295, 180, 24),
+            (1120, 225, 180, 24),
+            (1600, 355, 200, 24),
+            (2000, 285, 180, 24),
+            (2400, 335, 220, 24),
+
+            # Early-middle: longer routes with alternating heights.
+            (2900, 375, 230, 24),
+            (3260, 315, 190, 24),
+            (3600, 250, 170, 24),
+            (3980, 330, 220, 24),
+            (4380, 270, 180, 24),
+
+            # Middle: more pronounced height changes.
+            (5000, 365, 190, 24),
+            (5320, 285, 180, 24),
+            (5650, 205, 170, 24),
+            (6020, 290, 210, 24),
+            (6400, 350, 190, 24),
+            (6810, 265, 180, 24),
+            (7160, 195, 165, 24),
+            (7510, 300, 210, 24),
+
+            # Late section: narrower staggered platforms and fewer broad
+            # safe surfaces.
+            (8100, 360, 180, 24),
+            (8420, 275, 165, 24),
+            (8740, 205, 155, 24),
+            (9090, 300, 180, 24),
+            (9450, 235, 160, 24),
+            (9800, 345, 190, 24),
+            (10150, 265, 160, 24),
+
+            # Pre-boss gauntlet, followed by a deliberate clear runway.
+            (round(arena_x - 2850), 355, 180, 24),
+            (round(arena_x - 2480), 275, 165, 24),
+            (round(arena_x - 2110), 205, 155, 24),
+            (round(arena_x - 1730), 295, 175, 24),
+        ]
+
+        platforms = [
             Platform(
-                pygame.Rect(520, 365, 180, 24)
-            ),
-            Platform(
-                pygame.Rect(820, 295, 180, 24)
-            ),
-            Platform(
-                pygame.Rect(1120, 225, 180, 24)
-            ),
-            Platform(
-                pygame.Rect(1600, 355, 200, 24)
-            ),
-            Platform(
-                pygame.Rect(2000, 285, 180, 24)
-            ),
-            Platform(
-                pygame.Rect(2400, 335, 220, 24)
-            ),
+                pygame.Rect(x, y, width, height)
+            )
+            for x, y, width, height in platform_specs
+        ]
+
+        platforms.extend([
             # Boss arena: low-left
             Platform(
                 pygame.Rect(
@@ -168,6 +223,21 @@ class World:
                     24,
                 )
             ),
+        ])
+
+        return platforms
+
+    def _create_apples(self) -> list[Apple]:
+        """
+        Three fixed recovery pickups placed after increasingly difficult
+        stretches. Apples never respawn during a run.
+        """
+        arena_x = self.boss_arena_left
+
+        return [
+            Apple(position=(2850, 430)),
+            Apple(position=(6550, 430)),
+            Apple(position=(arena_x - 1450, 430)),
         ]
 
     def handle_event(
@@ -212,6 +282,10 @@ class World:
 
         if not self.fire_powerup.collected:
             self.fire_powerup.begin_physics_step()
+
+        for apple in self.apples:
+            if not apple.collected:
+                apple.begin_physics_step()
 
         for fireball in self.fireballs:
             fireball.begin_physics_step()
@@ -263,6 +337,21 @@ class World:
 
                 # Transformation begins immediately.
                 return
+
+        # ---------------------------------------------------------
+        # APPLES
+        # ---------------------------------------------------------
+
+        for apple in self.apples:
+            if apple.collected:
+                continue
+
+            apple.update(delta_time)
+
+            if self.player.collision_rect.colliderect(
+                apple.collision_rect
+            ):
+                apple.collect(self.player)
 
         # ---------------------------------------------------------
         # MOBS
@@ -346,6 +435,13 @@ class World:
             camera_x,
             alpha,
         )
+
+        for apple in self.apples:
+            apple.render(
+                screen,
+                camera_x,
+                alpha,
+            )
 
         for mob in self.mobs:
             mob.render(
@@ -458,6 +554,12 @@ class World:
 
         for platform in self.platforms:
             platform.render_debug(
+                screen,
+                camera_x,
+            )
+
+        for apple in self.apples:
+            apple.render_debug(
                 screen,
                 camera_x,
             )
