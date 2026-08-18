@@ -26,7 +26,12 @@ class WorldState(BaseState):
         )
 
     def enter(self) -> None:
-        pass
+        # Every transition into gameplay starts a fresh run. This prevents
+        # defeated mobs, collected power-ups, projectiles, camera locks, and
+        # boss state from leaking into a restart.
+        self.world = World(
+            self.screen.get_size()
+        )
 
     def exit(self) -> None:
         pass
@@ -51,5 +56,17 @@ class WorldState(BaseState):
     def update(self, delta_time: float) -> None:
         self.world.update(delta_time)
 
+        if self.world.player_defeated:
+            self.state_manager.change_state(
+                "defeat"
+            )
+            return
+
+        if self.world.boss_defeated:
+            self.state_manager.change_state(
+                "victory"
+            )
+            return
+        
     def render(self, screen: pygame.Surface, alpha: float) -> None:
         self.world.render(screen, alpha)

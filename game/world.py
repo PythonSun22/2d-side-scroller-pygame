@@ -181,7 +181,7 @@ class World:
             if event.key == pygame.K_F2:
                 self._debug_teleport_to_boss()
 
-        if self.player.is_transforming:
+        if self.player.is_transforming or self.player.is_dying:
             return
 
         if event.type == pygame.KEYDOWN:
@@ -215,6 +215,15 @@ class World:
 
         for fireball in self.fireballs:
             fireball.begin_physics_step()
+
+        # ---------------------------------------------------------
+        # PLAYER DEATH FREEZE
+        # ---------------------------------------------------------
+
+        if self.player.is_dying:
+            self.sword.force_sheathed()
+            self.player.update_death(delta_time)
+            return
 
         # ---------------------------------------------------------
         # TRANSFORMATION FREEZE
@@ -879,3 +888,19 @@ class World:
         )
 
         return True
+
+    @property
+    def player_defeated(self) -> bool:
+        return (
+            self.player.is_dying
+            and self.player.death_elapsed
+            >= PlayerTuning.DEATH_DISPLAY_DURATION
+        )
+
+
+    @property
+    def boss_defeated(self) -> bool:
+        return (
+            self.boss.is_defeated
+            and self.boss.should_remove
+        )

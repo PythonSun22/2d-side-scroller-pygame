@@ -33,6 +33,9 @@ class Player:
         "main_char_walk_5.png",
     )
 
+    NORMAL_DEATH_IMAGE = "greenFreddyDead.png"
+    POWERED_DEATH_IMAGE = "main_char_death.png"
+
     def __init__(
         self,
         position: tuple[int, int],
@@ -48,6 +51,16 @@ class Player:
             assets.load_image(filename, alpha=True)
             for filename in self.POWERED_WALK_IMAGES
         ]
+
+        self.normal_death_image = assets.load_image(
+            self.NORMAL_DEATH_IMAGE,
+            alpha=True,
+        )
+
+        self.powered_death_image = assets.load_image(
+            self.POWERED_DEATH_IMAGE,
+            alpha=True,
+        )
 
         self.frames = self.normal_frames
 
@@ -96,6 +109,9 @@ class Player:
 
         self.transform_elapsed = 0.0
         self.transform_render_offset_y = 0.0
+
+        self.is_dying = False
+        self.death_elapsed = 0.0
 
         self._synchronize_rectangles()
 
@@ -375,7 +391,7 @@ class Player:
             self.get_interpolated_feet_position(alpha)
         )
 
-        if self.is_invulnerable:
+        if not self.is_dying and self.is_invulnerable:
             flash_phase = int(
                 self.invulnerability_timer * 12
             )
@@ -384,8 +400,8 @@ class Player:
                 return
 
         image_offset_x = 0
-        
-        if self.current_frame == 0:
+
+        if not self.is_dying and self.current_frame == 0:
             image_offset_x = (
                 PlayerTuning.IDLE_IMAGE_OFFSET_X
                 if self.facing_right
@@ -499,6 +515,9 @@ class Player:
         self.is_on_ground = False
         self.coyote_timer = 0.0
 
+        if self.health <= 0:
+            self.start_death()
+
         return True
 
     def _update_damage_state(
@@ -537,6 +556,50 @@ class Player:
                 0.0,
                 self.knockback_velocity_x + deceleration,
             )
+
+    def start_death(self) -> None:
+        if self.is_dying:
+            return
+
+        self.is_dying = True
+        self.death_elapsed = 0.0
+
+        # Death presentation supersedes temporary combat/transform effects.
+        self.invulnerability_timer = 0.0
+        self.is_transforming = False
+        self.transform_render_offset_y = 0.0
+
+        self.is_moving = False
+        self.velocity_y = 0.0
+        self.knockback_velocity_x = 0.0
+        self.jump_requested = False
+
+        death_image = (
+            self.powered_death_image
+            if self.has_fire_power
+            else self.normal_death_image
+        )
+
+        if self.facing_right:
+            self.image = death_image
+        else:
+            self.image = pygame.transform.flip(
+                death_image,
+                True,
+                False,
+            )
+
+        self.current_frame = 0
+        self._synchronize_rectangles()
+
+    def update_death(
+        self,
+        delta_time: float,
+    ) -> None:
+        if not self.is_dying:
+            return
+
+        self.death_elapsed += delta_time
 
     def start_fire_transformation(self) -> None:
         if self.has_fire_power or self.is_transforming:

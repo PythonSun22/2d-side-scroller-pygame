@@ -9,6 +9,8 @@ from state_manager import StateManager
 from states.world_state import WorldState
 from states.menu_state import MenuState
 from states.options_state import OptionsState
+from states.victory_state import VictoryState
+from states.defeat_state import DefeatState
 
 
 # ---------------------------------------------------------------------------
@@ -99,9 +101,21 @@ class Game:
             state_manager=self.state_manager,
         )
 
+        victory_state = VictoryState(
+            screen = self.screen,
+            state_manager = self.state_manager,
+        )
+
+        defeat_state = DefeatState(
+            screen = self.screen,
+            state_manager = self.state_manager,
+        )
+
         self.state_manager.register_state("menu", menu_state)
         self.state_manager.register_state("world", world_state)
         self.state_manager.register_state("options", options_state)
+        self.state_manager.register_state("victory", victory_state)
+        self.state_manager.register_state("defeat", defeat_state)
 
         self.state_manager.change_state("menu")
 

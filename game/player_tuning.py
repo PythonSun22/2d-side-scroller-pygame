@@ -41,6 +41,9 @@ class PlayerTuning:
     KNOCKBACK_VERTICAL_SPEED = 420.0
     KNOCKBACK_DECELERATION = 1600.0
 
+    # Defeat presentation
+    DEATH_DISPLAY_DURATION = 0.85
+
     # Fire transformation
     FIRE_TRANSFORM_DURATION = 1.0
     FIRE_TRANSFORM_FLOAT_HEIGHT = 30.0
